@@ -1,64 +1,61 @@
-# Wolke – persönlicher Cloud-KI-Assistent
+# Wolke
 
-Deutscher Chat, Spracheingabe, KI-Sprachausgabe, Kamera- und Bildschirmbilderkennung. Die KI läuft über Google Gemini in der Cloud. Auf deinem PC werden keine KI-Modelle installiert. Browser-APIs erfassen freigegebene Medien; das Node.js-Backend hält den API-Schlüssel und spricht mit Google Gemini.
+Світлий українськомовний чат із Gemini. Інтерфейс автоматично адаптується до телефона, планшета й комп’ютера. Відповіді з’являються поступово, одразу після першого фрагмента від Gemini. Назва залишається **Wolke**.
 
-## Starten
+## Запуск
 
-Voraussetzung: Node.js 24 oder neuer (getestet mit Node 24) und ein Gemini-API-Projekt mit passendem Kontingent bzw. aktivierter Abrechnung und Zugriff auf die konfigurierten Modelle.
+Потрібен Node.js 24 або новіший.
 
 ```sh
 npm ci
 cp .env.example .env
-# .env mit einem Editor öffnen und GEMINI_API_KEY setzen
+# Укажи GEMINI_API_KEY у .env, лише на сервері.
 npm start
 ```
 
-Für Entwicklung: `npm run dev`. Standardport: 3000. Lokal im Browser `http://localhost:3000` öffnen. In der Cloud HTTPS über deinen Hostinganbieter verwenden. Es gibt absichtlich keinen Demo-Modus mit erfundenen KI-Antworten: Ohne Schlüssel zeigt die App eine klare Meldung.
+Для розробки: `npm run dev`. Типовий порт — 3000. Локальна адреса — http://localhost:3000. Для віддаленого використання потрібен хостинг із HTTPS. Усі моделі працюють у хмарі; на пристрої користувача моделі не встановлюються.
 
-In `.env` **GEMINI_API_KEY** eintragen. Erstelle den Schlüssel unter https://aistudio.google.com/apikey . Du brauchst keinen OpenAI-Schlüssel. Für eine Veröffentlichung zusätzlich ein langes, zufälliges **APP_PASSWORD**, **NODE_ENV=production** und **APP_ORIGIN=https://deine-domain.example** (ohne abschließenden Schrägstrich) setzen. Der Browser fragt nach einer HTTP-Basic-Anmeldung: Benutzername beliebig, Passwort gleich APP_PASSWORD. Das Passwort ausschließlich über HTTPS verwenden. Die App ist für eine Person, nicht für mehrere Benutzer konzipiert.
+Ключ можна створити на https://aistudio.google.com/apikey . Ключ ніколи не надсилається до браузера. `.env` виключено з Git і Docker. Під час розгортання використовуй захищені змінні середовища хостингу.
 
-Optional lassen sich `PORT`, `GEMINI_CHAT_MODEL`, `GEMINI_AUDIO_MODEL` und `GEMINI_SPEECH_MODEL` anpassen. Standard: `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3.8-flash-tts`. Das Chatmodell muss Text und Bilder unterstützen. Schlüssel niemals in `public/`, Git, Screenshots oder Chatnachrichten kopieren. `.env` ist von Git und Docker ausgeschlossen.
+## Налаштування
 
-## Benutzen
+| Змінна | Значення |
+|---|---|
+| `GEMINI_API_KEY` | Серверний ключ Google Gemini |
+| `APP_PASSWORD` | Пароль входу; обов’язковий у production |
+| `NODE_ENV` | `production` для публічного сервера |
+| `PORT` | Порт сервера, типово 3000; Render надає автоматично |
+| `APP_ORIGIN` | Точна HTTPS-адреса власного домену без кінцевого `/` |
+| `GEMINI_CHAT_MODEL` | Типово `gemini-3.1-flash-lite` |
+| `GEMINI_AUDIO_MODEL` | `gemini-3.1-flash-lite`, для сумісності з аудіо-API |
+| `GEMINI_SPEECH_MODEL` | `gemini-3.8-flash-tts` |
 
-- Nachricht eingeben, Enter zum Senden, Shift+Enter für einen Zeilenumbruch. Chat bleibt nur im Tab-Arbeitsspeicher. Antworten erscheinen als sicherer Klartext, einschließlich Code; HTML wird nicht ausgeführt.
-- **Mikrofon:** Browserfreigabe erteilen, sprechen, erneut klicken. Nach dem Stopp (spätestens nach 60 Sekunden) wird die Aufnahme zur Transkription übertragen. Den erkannten Text prüfen und anschließend senden. „Alle Freigaben … stoppen“ verwirft die laufende Aufnahme.
-- **Kamera / Bildschirm:** Vorschau ist lokal. Bildschirmfreigabe benötigt einen unterstützten Desktop-Browser; Audio des Bildschirms wird nicht aufgenommen. Eine neue visuelle Quelle ersetzt die bisherige. Freigabe im Browser oder in der App jederzeit stoppen.
-- **Einzelbild aufnehmen:** Ein JPEG (maximal 1280 Pixel pro Seite) wird angehängt. Erst „Senden“ übermittelt das Bild mit der Frage. Kein dauerhaftes Live-Video wird gestreamt. Ein angehängtes Bild lässt sich vor dem Senden entfernen. „Alle Freigaben … stoppen“ entfernt es ebenfalls.
-- **Vorlesen:** Pro Antwort oder automatisch aktivieren. Die Stimme ist KI-generiert. „Alle Freigaben … stoppen“ beendet auch die Wiedergabe und bricht aktive Browseranfragen ab. Bereits beim Anbieter verarbeitete Daten und entstandene Kosten können nicht zurückgerufen werden.
+На Render використовується `RENDER_EXTERNAL_URL`, якщо `APP_ORIGIN` не вказано. Ім’я користувача під час входу довільне, пароль дорівнює `APP_PASSWORD`. Передавай пароль лише через HTTPS. Не відключай перевірку TLS. Команда запуску використовує `--use-env-proxy`, щоб працювати з налаштованим HTTPS-проксі та довіреними CA.
 
-Mikrofon/Kamera benötigen HTTPS oder localhost und Browserberechtigungen. Bei verweigertem Zugriff über das Schlosssymbol des Browsers erneut freigeben. Bildschirmfreigabe ist auf Mobilgeräten oft nicht verfügbar. Automatische Audiowiedergabe kann vom Browser blockiert werden; dann „Vorlesen“ anklicken.
+## Чати й приватність
 
-## Veröffentlichen (Cloud)
+- Новий чат створюється кнопкою «Новий чат». Список зліва на комп’ютері та випадаючий список на телефоні дозволяють продовжити розмову.
+- Текстова історія зберігається в `localStorage` цього браузера, зокрема після закриття вкладки. Синхронізації між пристроями немає. У приватному режимі браузер може видалити історію після закриття.
+- Історію можна видалити кнопкою видалення чату. Очищення даних браузера видаляє всі чати. Якщо сховище переповнене або заблоковане, застосунок повідомляє, що збереження не вдалося.
+- Для кожної відповіді передаються до 30 останніх текстових повідомлень. Старіші повідомлення збережені для читання, але модель може не пам’ятати їх. Перервана відповідь не потрапляє до збереженого контексту.
+- Немає панелі камери, мікрофона чи показу екрана. Браузер не запитує доступу до цих пристроїв. Старі захищені серверні маршрути аналізу зображень і транскрипції збережені для сумісності.
+- Кнопка «Озвучити» передає текст відповіді до Gemini. Повторне натискання зупиняє генерацію або відтворення. Аудіо не записується на диск.
+- Текст відображається без виконання HTML. Модель не керує комп’ютером і не виконує код.
 
-Auf einem Node.js-Hostingdienst, z. B. Render, Railway oder einem eigenen Server:
+Google обробляє надіслані дані за своїми правилами; на безкоштовних тарифах дані можуть використовуватися для вдосконалення продуктів. Не надсилай конфіденційні дані. Умови: https://ai.google.dev/gemini-api/terms . Ціни: https://ai.google.dev/gemini-api/docs/pricing . Запити та озвучення можуть витрачати безкоштовну квоту або мати вартість. Застосунок не гарантує жорсткого грошового ліміту. Не активуй платну абонплату, якщо плануєш використовувати лише безкоштовну квоту.
 
-1. Repository bereitstellen. Build: `npm ci --omit=dev`. Start: `npm start`. Alternativ das enthaltene Dockerfile bauen und ausführen; niemals den API-Schlüssel ins Image schreiben.
-2. In den **serverseitigen Umgebungsvariablen** `GEMINI_API_KEY`, `APP_PASSWORD`, `NODE_ENV=production` und `APP_ORIGIN` mit der öffentlichen HTTPS-Origin setzen. `PORT` wird meist vom Anbieter vorgegeben.
-3. HTTPS aktivieren. Reverse Proxy muss die öffentliche Origin unverändert als Host weiterleiten; `APP_ORIGIN` erlaubt diese Origin auch bei TLS-Terminierung vor Node. API- und Frontendpfade unter derselben Origin betreiben. Uploadlimit mindestens 12 MB plus Multipart-Overhead, Antworttimeout mindestens 100 Sekunden.
-4. Website öffnen und anmelden. Gesundheitsanzeige prüfen, eine deutsche Frage senden, Mikrofon transkribieren, ein unkritisches Kamerabild beschreiben lassen und Stimme testen.
+## Швидкість
 
-In Produktion verweigert der Server ohne APP_PASSWORD alle Zugriffe. Keine öffentlichen ungeschützten Deployments. Die App hat zusätzlich ein einfaches In-Memory-Limit von 30 API-Anfragen pro Minute und IP. Hinter einem Proxy können alle Benutzer dieselbe IP teilen; für diese persönliche Anwendung ist das absichtlich konservativ. Mehrere Instanzen benötigen einen gemeinsamen externen Rate-Limiter. Kein `trust proxy` blind aktivieren. Für einen Betrieb mit mehreren Benutzern sind individuelle Anmeldung, Quoten und ein geeignetes Datenschutzkonzept zusätzlich nötig.
+Сервер використовує `streamGenerateContent` і передає фрагменти тексту до браузера без очікування завершення всієї відповіді. Для стандартної моделі використовується мінімальний рівень міркування; інструкція просить відповідати стисло, але повно для програмування. Текст оновлюється не частіше одного разу на кадр. Ліміт відповіді — 4096 токенів. Сповільнення API Google і запуск Render Free після простою не контролюються застосунком. Штучного утримання безкоштовного сервера активним немає.
 
-## Daten, Kosten und Grenzen
+На ПК Enter надсилає, Shift+Enter створює новий рядок. На сенсорному пристрої Enter створює новий рядок, а стрілка надсилає повідомлення. Квадрат зупиняє активний запит. Поле вводу не закривається під час відповіді, можна набирати наступне повідомлення.
 
-Text, Bilder, Transkription und Stimme verursachen echte API-Kosten. Audio wird maximal 60 Sekunden aufgenommen und serverseitig auf 12 MB begrenzt; Chatantworten auf 4.096 Ausgabetokens, Sprachausgabe auf 4.000 Zeichen. Der Browser sendet maximal 30 Textnachrichten als Kontext und nur das aktuell angehängte Bild. Frühere Bilder werden nicht erneut geschickt. Bei langen Chats kann Kontext verloren gehen.
+## Розгортання
 
-Diese App speichert Ton/Bilder/Chats standardmäßig nicht dauerhaft. Uploads liegen vorübergehend im Arbeitsspeicher des Servers; Vorschaubilder und Verlauf im Tab. Es gibt keine Datenbank, keinen Cloudspeicher und keine Inhaltsprotokollierung durch die App. Hostinganbieter können Zugriffsmetadaten protokollieren. Bei Google Gemini gelten dessen eigene Regeln, einschließlich möglicher Aufbewahrung zur Missbrauchserkennung. Die Verarbeitung und mögliche Datennutzung hängen von Googles Bedingungen und deinem Tarif ab. Insbesondere können Inhalte bei unbezahlten Angeboten zur Produktverbesserung verwendet werden; keine vertraulichen Daten übertragen. Details: https://ai.google.dev/gemini-api/terms . Preise: https://ai.google.dev/gemini-api/docs/pricing . Budgets und Alarme im Google-Cloud-Projekt setzen; ein hartes Euro-Limit wird von der App nicht erzwungen.
+Інструкція — [VEROEFFENTLICHEN.md](VEROEFFENTLICHEN.md). На Render Node 24: build `npm ci --omit=dev`, start `npm start`, тариф **Free**. Не додавай платних послуг. Потрібні `GEMINI_API_KEY`, `APP_PASSWORD`, `NODE_ENV=production`. Для початкового створення через Blueprint є `render.yaml`. Увімкнений Auto-Deploy розгортає нові коміти гілки `main`; зміни коду самі не змінюють тариф і збережені секрети Render.
 
-Die App kann Dinge und Bildschirminhalte beschreiben und bei Code helfen, führt aber keine Programme oder Computeraktionen aus. Bilderkennung kann irren. Keine vertraulichen Inhalte oder fremden Personen ohne Berechtigung übertragen. Vor einer öffentlichen Veröffentlichung eigene Datenschutz-/Impressumsanforderungen prüfen und passende Angaben ergänzen.
+Відкритий маршрут `GET /healthz` повертає лише стан і версію застосунку без конфігурації чи секретів. `GET /api/health` захищений паролем і перевіряє наявність ключа, але не гарантує працездатності Google. Інші маршрути також захищені. Для персонального використання є ліміт 30 API-запитів на хвилину та IP. За проксі користувачі можуть ділити одну IP-адресу; для багатокористувацької системи потрібні окрема авторизація, спільний rate-limiter та квоти.
 
-## Prüfung und Fehlersuche
+## Перевірка
 
-`npm test` prüft echte HTTP-Routen mit simuliertem Google Gemini-Dienst: fehlender Schlüssel, Chat mit Bild, Audio und Fehlerbehandlung. `node --check server.js` und `node --check public/app.js` prüfen die Syntax. Echte Google Gemini-Antworten erfordern deinen Schlüssel; Browserfreigaben müssen in einem echten Browser geprüft werden.
-
-- **Schlüssel fehlt:** `.env` neben server.js oder Hosting-Variable setzen und neu starten.
-- **HTTP 401 von Google Gemini:** Schlüssel bzw. Projektberechtigung prüfen.
-- **Limit/Guthaben:** Google Gemini-Projektabrechnung, verfügbare Modelle und Limits prüfen.
-- **Fremde Website blockiert:** APP_ORIGIN muss exakt zur öffentlichen URL passen.
-- **Freigabe nicht möglich:** HTTPS, Browserunterstützung, Geräte und Berechtigungen prüfen.
-- **Kein Ton:** Browserlautstärke und automatische Wiedergabe prüfen; „Vorlesen“ manuell anklicken.
-
-Die Startbefehle nutzen `--use-env-proxy`, damit Node die HTTPS_PROXY/HTTP_PROXY-Umgebung und vorhandene CA-Konfiguration respektiert. TLS-Verifikation bleibt aktiviert.
-
-Netzwerk benötigt `generativelanguage.googleapis.com` über HTTPS und für Installation `registry.npmjs.org`. Kein externes CDN, keine Schriftartendownloads und keine weiteren Laufzeitdienste.
+`npm test` — HTTP-тести з імітацією Gemini: українські інструкції, помилки, захист, аудіо, часткові UTF-8-фрагменти, потокова відповідь та її скасування. Вони не витрачають квоту API. `node --check server.js` і `node --check public/app.js` перевіряють синтаксис. Справжній Gemini потребує дійсного ключа й доступного контингенту.

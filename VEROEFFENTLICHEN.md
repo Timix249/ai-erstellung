@@ -1,16 +1,20 @@
-# Wolke als echte HTTPS-Website veröffentlichen
+# Публічна HTTPS-адреса Wolke
 
-Die Website ist fertig. Die Codex-Umgebung bereitzustellen erzeugt keine öffentliche Website-Adresse. Für diese braucht es einen Webhoster. Die Datei render.yaml bereitet Render als Hoster vor.
+Наявний сайт: https://ai-erstellung.onrender.com . Програма працює на Render; комп’ютер користувача може бути вимкнений.
 
-## Einmalige Einrichtung bei Render
+Для вже створеного сервісу Render з увімкненим Auto-Deploy коміти `main` автоматично запускають розгортання. Збережені `GEMINI_API_KEY` і `APP_PASSWORD` залишаються на Render та не потрапляють у Git.
 
-1. Melde dich auf https://dashboard.render.com an und verbinde dein GitHub-Konto.
-2. Stelle sicher, dass die Projektdateien einschließlich render.yaml im Repository Timix249/ai-erstellung vorhanden sind. Niemals .env hochladen. Ein Paket ohne Schlüssel liegt unter /workspace/wolke-veroeffentlichen.zip.
-3. Wähle in Render „New“ → „Blueprint“ und das Repository. Render liest render.yaml und legt den Node-Webdienst an.
-4. Hinterlege GEMINI_API_KEY direkt im geschützten Render-Eingabefeld. Der in Codex gespeicherte Proxy-Schlüssel wird nicht zu Render exportiert. Verwende deinen Schlüssel aus Google AI Studio. Render erzeugt APP_PASSWORD automatisch.
-5. Nach erfolgreichem Deployment zeigt Render die öffentliche HTTPS-Adresse. Öffne diese. Benutzername beliebig, als Passwort den Wert von APP_PASSWORD aus deinen Render-Umgebungsvariablen verwenden. Diesen Wert und den API-Schlüssel nicht öffentlich teilen.
-6. Prüfe eine Chatfrage, Stimme sowie Kamera-/Bildschirmfreigabe. Für die Render-Adresse ist APP_ORIGIN nicht nötig: Der Server verwendet RENDER_EXTERNAL_URL. Bei eigener Domain APP_ORIGIN auf deren exakte HTTPS-Origin setzen.
+## Нове встановлення
 
-Der Blueprint wählt den kostenlosen Webdienst, sofern dein Konto diesen Tarif unterstützt. Er kann bei Inaktivität einschlafen; der erste Aufruf dauert dann länger. Prüfe die aktuellen Tarifbedingungen im Render-Dialog. Gemini-Kosten und Kontingente fallen unabhängig davon an. Kostenpflichtige Upgrades sind nicht erforderlich vorbereitet.
+1. На https://dashboard.render.com увійди через GitHub і підключи `Timix249/ai-erstellung`.
+2. Вибери New → Web Service, мову Node, гілку `main`, кореневий каталог залиш порожнім.
+3. Build Command: `npm ci --omit=dev`. Start Command: `npm start`.
+4. Вибери **Free — $0/month**. Не активуй платний тариф або додаткові платні послуги.
+5. У Environment вкажи `NODE_VERSION=24`, `NODE_ENV=production`, власний `GEMINI_API_KEY` і довгий `APP_PASSWORD`. Не публікуй секрети в чаті чи на знімках екрана. Ключ із Codex не експортується автоматично на Render.
+6. Deploy. Після статусу Live відкрий надану HTTPS-адресу на будь-якому пристрої. Ім’я користувача довільне, пароль — `APP_PASSWORD`.
 
-Die App verweigert in Produktion Zugriff ohne APP_PASSWORD. Alle Medien laufen weiterhin über denselben sicheren Server; keine API-Schlüssel im Browser. Der Browser benötigt keine installierten KI-Modelle.
+Альтернатива для нового встановлення: New → Blueprint і файл `render.yaml`. APP_PASSWORD створюється автоматично. Його можна переглянути або змінити в Render → Environment.
+
+Після простою Render Free може запускатися повільно. Безкоштовні квоти Gemini незалежні від тарифу Render. Перевір актуальні умови тарифів. Для власного домену встанови `APP_ORIGIN` у точну HTTPS-адресу без `/` у кінці. Для адреси Render цього не потрібно.
+
+`GET /healthz` дозволяє перевірити версію без пароля; жодних секретів він не показує. Чати зберігаються лише в браузері на конкретному пристрої, без синхронізації між пристроями.

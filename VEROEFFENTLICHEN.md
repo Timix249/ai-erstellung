@@ -11,7 +11,7 @@
 3. Build Command: `npm ci --omit=dev`. Start Command: `npm start`.
 4. Вибери **Free — $0/month**. Не активуй платний тариф або додаткові платні послуги.
 5. У Environment вкажи `NODE_VERSION=24`, `NODE_ENV=production`, власний `GEMINI_API_KEY` і довгий `APP_PASSWORD`. Не публікуй секрети в чаті чи на знімках екрана. Ключ із Codex не експортується автоматично на Render.
-6. Deploy. Після статусу Live відкрий надану HTTPS-адресу на будь-якому пристрої. Ім’я користувача довільне, пароль — `APP_PASSWORD`.
+6. Deploy. Після статусу Live відкрий надану HTTPS-адресу на будь-якому пристрої. Уведи PIN із `APP_PASSWORD`. Ім’я користувача не потрібне.
 
 Альтернатива для нового встановлення: New → Blueprint і файл `render.yaml`. APP_PASSWORD створюється автоматично. Його можна переглянути або змінити в Render → Environment.
 

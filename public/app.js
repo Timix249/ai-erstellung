@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 const storageKey='wolke.chats.v1',requests=new Set();
-let settings={city:'Germersheim',answerStyle:'normal',textSize:'normal',autoVoice:false},weather=null,weatherRequest=null;
+let settings={city:'Germersheim',answerStyle:'normal',textSize:'normal',autoVoice:false,webSearch:false},weather=null,weatherRequest=null;
 let chats=[],activeChatId=null,history=[],busy=false,noticeTimer=null,storageReadable=true,audio=null,audioURL=null,speechEpoch=0;
 function notify(text,error=false){clearTimeout(noticeTimer);$('status').textContent=text;$('status').classList.toggle('error',error);$('status').hidden=false;noticeTimer=setTimeout(()=>$('status').hidden=true,error?12000:5000);}
 function report(error){notify(error.name==='AbortError'?'Запит зупинено.':error.message||'Не вдалося виконати запит.',error.name!=='AbortError');}
@@ -28,7 +28,7 @@ function addMessage(role,text){
  $('welcome')?.remove();const el=document.createElement('article');el.className=`message ${role}`;
  const avatar=document.createElement('div');avatar.className='message-avatar';if(role==='user')avatar.textContent='ТИ';else{const logo=document.createElement('img');logo.src='/logo.svg';logo.alt='';logo.width=30;logo.height=30;avatar.append(logo);}
  const body=document.createElement('div');body.className='message-body';const name=document.createElement('div');name.className='message-name';name.textContent=role==='user'?'Ти':'Wolke';
- const content=document.createElement('div');content.className='message-text';content.textContent=text;body.append(name,content);el.append(avatar,body);$('messages').append(el);
+ const content=document.createElement('div');content.className='message-text';renderText(content,text);body.append(name,content);el.append(avatar,body);$('messages').append(el);
  if(role==='assistant'&&text)addReadButton(el,text);
  $('messages').scrollTop=$('messages').scrollHeight;return el;
 }
@@ -68,9 +68,9 @@ $('chatForm').onsubmit=async e=>{
  abortRequests();const outgoing=[...history.slice(-28),{role:'user',content:text}];addMessage('user',text);$('prompt').value='';resizeInput();setBusy(true);
  const pending=document.createElement('p');pending.className='pending';pending.textContent='Wolke відповідає…';$('messages').append(pending);
  let reply=null,replyText='',frame=null;
- const paint=()=>{frame=null;if(!reply)return;const list=$('messages'),atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<180;reply.querySelector('.message-text').textContent=replyText;if(atBottom)list.scrollTop=list.scrollHeight;};
+ const paint=()=>{frame=null;if(!reply)return;const list=$('messages'),atBottom=list.scrollHeight-list.scrollTop-list.clientHeight<180;renderText(reply.querySelector('.message-text'),replyText);if(atBottom)list.scrollTop=list.scrollHeight;};
  try{
-  const data=await api('/api/chat',{messages:outgoing,stream:true,weatherCity:settings.city,answerStyle:settings.answerStyle},delta=>{
+  const data=await api('/api/chat',{messages:outgoing,stream:true,weatherCity:settings.city,answerStyle:settings.answerStyle,webSearch:settings.webSearch},delta=>{
    pending.remove();if(!reply){reply=addMessage('assistant','');reply.setAttribute('aria-busy','true');}replyText+=delta;if(frame===null)frame=requestAnimationFrame(paint);
   });
   if(frame!==null)cancelAnimationFrame(frame);paint();reply?.setAttribute('aria-busy','false');
@@ -96,8 +96,8 @@ fetch('/api/health').then(async r=>{if(r.status===401){location.assign('/login')
 async function logout(){abortRequests();try{const response=await fetch('/auth/logout',{method:'POST'});if(!response.ok)throw new Error();location.assign('/login');}catch{notify('Не вдалося вийти. Спробуй ще раз.',true);}}
 $('logout').onclick=$('mobileLogout').onclick=logout;
 
-function loadSettings(){try{const stored=JSON.parse(localStorage.getItem('wolke.settings.v1')||'null');if(stored){if(typeof stored.city==='string'&&stored.city.trim().length>=2&&stored.city.length<=100)settings.city=stored.city.trim();if(['short','normal','detailed'].includes(stored.answerStyle))settings.answerStyle=stored.answerStyle;if(['normal','large'].includes(stored.textSize))settings.textSize=stored.textSize;settings.autoVoice=stored.autoVoice===true;}}catch{}document.documentElement.dataset.textSize=settings.textSize;}
-function openSettings(){const form=$('settingsForm');form.elements.city.value=settings.city;$('answerStyle').value=settings.answerStyle;$('textSize').value=settings.textSize;$('autoVoice').checked=settings.autoVoice;$('settingsError').hidden=true;$('settingsDialog').showModal();}
+function loadSettings(){try{const stored=JSON.parse(localStorage.getItem('wolke.settings.v1')||'null');if(stored){if(typeof stored.city==='string'&&stored.city.trim().length>=2&&stored.city.length<=100)settings.city=stored.city.trim();if(['short','normal','detailed'].includes(stored.answerStyle))settings.answerStyle=stored.answerStyle;if(['normal','large'].includes(stored.textSize))settings.textSize=stored.textSize;settings.autoVoice=stored.autoVoice===true;settings.webSearch=stored.webSearch===true;}}catch{}document.documentElement.dataset.textSize=settings.textSize;}
+function openSettings(){const form=$('settingsForm');form.elements.city.value=settings.city;$('answerStyle').value=settings.answerStyle;$('textSize').value=settings.textSize;$('autoVoice').checked=settings.autoVoice;$('webSearch').checked=settings.webSearch;$('settingsError').hidden=true;$('settingsDialog').showModal();}
 $('settingsButton').onclick=$('weatherSettings').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();
 function weatherSymbol(code,isDay=true){if(code===0)return isDay?'☀':'☾';if(code<=3)return '☁';if(code<=48)return '≋';if(code>=95)return 'ϟ';if((code>=71&&code<=77)||code===85||code===86)return '❄';return '☂';}
@@ -111,7 +111,9 @@ async function requestWeather(city,signal){
 async function refreshWeather(){weatherRequest?.abort();const controller=new AbortController();weatherRequest=controller;$('refreshWeather').disabled=true;try{const data=await requestWeather(settings.city,controller.signal);if(!controller.signal.aborted)showWeather(data);}catch(error){if(error.name!=='AbortError'){$('weatherCard').classList.add('weather-error');$('weatherDescription').textContent=weather?'Не вдалося оновити погоду':'Погода тимчасово недоступна';$('weatherDetails').textContent=weather?'Показано попередні дані. Натисни ↻.':error.message;}}finally{if(weatherRequest===controller)$('refreshWeather').disabled=false;}}
 $('refreshWeather').onclick=refreshWeather;
 $('askWeather').onclick=()=>{if(busy)return;$('prompt').value='Яка погода в '+settings.city+' сьогодні та завтра?';resizeInput();$('chatForm').requestSubmit();};
-$('settingsForm').onsubmit=async event=>{event.preventDefault();const city=$('weatherCity').value.trim();if(city.length<2)return;const button=$('saveSettings');button.disabled=true;$('settingsError').hidden=true;try{let data=weather;if(city!==settings.city)data=await requestWeather(city);const updated={city,answerStyle:$('answerStyle').value,textSize:$('textSize').value,autoVoice:$('autoVoice').checked};localStorage.setItem('wolke.settings.v1',JSON.stringify(updated));settings=updated;document.documentElement.dataset.textSize=settings.textSize;weatherRequest?.abort();if(data)showWeather(data);else void refreshWeather();$('settingsDialog').close();notify('Налаштування збережено.');}catch(error){$('settingsError').textContent=error.message||'Не вдалося зберегти налаштування.';$('settingsError').hidden=false;}finally{button.disabled=false;}};
+$('settingsForm').onsubmit=async event=>{event.preventDefault();const city=$('weatherCity').value.trim();if(city.length<2)return;const button=$('saveSettings');button.disabled=true;$('settingsError').hidden=true;try{let data=weather;if(city!==settings.city)data=await requestWeather(city);const updated={city,answerStyle:$('answerStyle').value,textSize:$('textSize').value,autoVoice:$('autoVoice').checked,webSearch:$('webSearch').checked};localStorage.setItem('wolke.settings.v1',JSON.stringify(updated));settings=updated;document.documentElement.dataset.textSize=settings.textSize;weatherRequest?.abort();if(data)showWeather(data);else void refreshWeather();$('settingsDialog').close();notify('Налаштування збережено.');}catch(error){$('settingsError').textContent=error.message||'Не вдалося зберегти налаштування.';$('settingsError').hidden=false;}finally{button.disabled=false;}};
 loadSettings();refreshWeather();
 setInterval(()=>{if(!document.hidden)void refreshWeather();},15*60*1000);
 window.addEventListener('pagehide',()=>weatherRequest?.abort());
+
+function renderText(el,text){el.replaceChildren();let start=0;for(const match of text.matchAll(/https:\/\/[^\s<>]+/g)){el.append(document.createTextNode(text.slice(start,match.index)));const link=document.createElement('a');link.href=match[0];link.textContent=match[0];link.target='_blank';link.rel='noopener noreferrer';el.append(link);start=match.index+match[0].length;}el.append(document.createTextNode(text.slice(start)));}

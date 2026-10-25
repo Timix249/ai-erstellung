@@ -16,7 +16,8 @@ async function api(path,body,onDelta=null,raw=false){
   if(!response.headers.get('content-type')?.includes('application/x-ndjson'))throw new Error('Онови сторінку, щоб отримувати відповіді одразу.');
   const decoder=new TextDecoder();let pending='',answer='',done=false;
   const consume=line=>{if(!line.trim())return;const event=JSON.parse(line);if(event.error)throw new Error(event.error);if(event.delta){answer+=event.delta;onDelta(event.delta);}if(event.done)done=true;};
-  for await(const chunk of response.body){pending+=decoder.decode(chunk,{stream:true});let pos;while((pos=pending.indexOf('\n'))>=0){consume(pending.slice(0,pos));pending=pending.slice(pos+1);}}
+  const reader=response.body.getReader();
+  try{while(true){const {value,done:ended}=await reader.read();if(ended)break;pending+=decoder.decode(value,{stream:true});let pos;while((pos=pending.indexOf('\n'))>=0){consume(pending.slice(0,pos));pending=pending.slice(pos+1);}}}finally{reader.releaseLock();}
   pending+=decoder.decode();if(pending.trim())consume(pending);
   if(!done)throw new Error('З’єднання перервалося. Відповідь може бути неповною.');
   return {answer};

@@ -1,8 +1,15 @@
 const weatherCache=new Map(),locationCache=new Map();
 const defaultLocation={name:'Germersheim',country:'Німеччина',latitude:49.2231,longitude:8.3639,timezone:'Europe/Berlin'};
 async function getJSON(url){
- try{const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('upstream');return await response.json();}
- catch{const error=new Error('Не вдалося отримати погоду. Спробуй пізніше.');error.status=502;throw error;}
+ let lastStatus;
+ for(let attempt=0;attempt<2;attempt++){
+  try{const response=await fetch(url,{signal:AbortSignal.timeout(12000)});lastStatus=response.status;
+   if(response.ok)return await response.json();
+   await response.body?.cancel();if(![429,502,503,504].includes(response.status))break;
+  }catch{lastStatus=undefined;}
+  if(attempt===0)await new Promise(resolve=>setTimeout(resolve,350));
+ }
+ const error=new Error(lastStatus===429?'Служба погоди тимчасово обмежила запити. Спробуй за хвилину.':'Не вдалося отримати погоду. Перевір з’єднання та спробуй пізніше.');error.status=502;throw error;
 }
 const descriptions=new Map([[0,'Ясно'],[1,'Переважно ясно'],[2,'Мінлива хмарність'],[3,'Хмарно'],[45,'Туман'],[48,'Паморозь і туман'],[51,'Легка мряка'],[53,'Мряка'],[55,'Сильна мряка'],[56,'Крижана мряка'],[57,'Крижана мряка'],[61,'Невеликий дощ'],[63,'Дощ'],[65,'Сильний дощ'],[66,'Крижаний дощ'],[67,'Крижаний дощ'],[71,'Невеликий сніг'],[73,'Сніг'],[75,'Сильний сніг'],[77,'Снігові зерна'],[80,'Короткочасний дощ'],[81,'Злива'],[82,'Сильна злива'],[85,'Снігопад'],[86,'Сильний снігопад'],[95,'Гроза'],[96,'Гроза з градом'],[99,'Гроза з градом']]);
 export async function getWeather(city='Germersheim'){

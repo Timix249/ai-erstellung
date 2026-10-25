@@ -155,7 +155,7 @@ async function syncCloud(){
  try{for(let attempt=0;attempt<3;attempt++){
    const response=await fetch('/api/sync');if(response.status===401)throw new Error('Увійди через Google ще раз');if(!response.ok)throw new Error('Хмарне сховище недоступне');const remote=await response.json();
    const merged=mergeState(snapshot(),remote.data);applyMergedState(merged);cloudDirty=false;if(remote.data&&JSON.stringify(remote.data)===JSON.stringify(merged)){$('cloudStatus').textContent='Синхронізовано';return;}
-   const saved=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:remote.revision,data:merged})});if(saved.status===409)continue;if(!saved.ok)throw new Error('Не вдалося зберегти в хмарі');$('cloudStatus').textContent='Синхронізовано';return;
+   const saved=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:remote.revision,data:merged})});if(saved.status===409)continue;if(!saved.ok)throw new Error((await saved.json()).error||'Не вдалося зберегти в хмарі');$('cloudStatus').textContent='Синхронізовано';return;
   }throw new Error('Одночасні зміни. Повторимо синхронізацію');
  }catch(error){cloudDirty=true;$('cloudStatus').textContent=error.message+' · локальні дані збережено';}
  finally{cloudSyncing=false;if(cloudDirty){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>void syncCloud(),30000);}}

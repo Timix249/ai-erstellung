@@ -1,6 +1,7 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package*.json ./
+COPY scripts ./scripts
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server.js weather.js web-search.js cloud.js ./
 COPY public ./public

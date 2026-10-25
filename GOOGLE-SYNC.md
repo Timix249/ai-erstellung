@@ -1,30 +1,33 @@
-# Google-Anmeldung und Synchronisierung aktivieren
+# Google-Anmeldung und Gerätesynchronisierung mit Firebase
 
-Der Code und die Datenbankregeln sind vorbereitet. Ein echtes Supabase-Projekt und Google OAuth müssen einmal im eigenen Konto eingerichtet werden. Die vorhandene PIN funktioniert bis dahin weiter. Es werden keine kostenpflichtigen Dienste automatisch gebucht.
+Die Anwendung ist auf Firebase von Google vorbereitet. Supabase ist nicht nötig. Bis zur Aktivierung bleibt die PIN verwendbar. Es werden keine kostenpflichtigen Dienste automatisch aktiviert.
 
-1. Unter https://supabase.com/dashboard ein Projekt im Free-Tarif anlegen. Die aktuelle Verfügbarkeit und Limits prüfen. Supabase ist ein separater Anbieter und nicht mit deinem Gemini-Schlüssel verbunden.
-2. Im Supabase SQL Editor den vollständigen Inhalt von `supabase/schema.sql` ausführen. RLS nicht deaktivieren. So darf jeder angemeldete Benutzer nur den eigenen Datensatz lesen und schreiben.
-3. In Supabase Authentication → URL Configuration:
-   - Site URL: `https://ai-erstellung.onrender.com`
-   - Redirect URL: `https://ai-erstellung.onrender.com/auth/callback`
-4. In Google Cloud Console ein OAuth-Projekt bzw. einen OAuth-Webclient erstellen. Den Google-Login konfigurieren (bei Teststatus deine E-Mail als Testnutzer hinzufügen). Als erlaubte Redirect-URI die **Supabase-Callback-URL** aus Authentication → Providers → Google verwenden, beispielsweise `https://DEIN-PROJEKT.supabase.co/auth/v1/callback`. Nicht die Render-Callback-URL in dieses Google-Feld eintragen.
-5. In Supabase unter Authentication → Providers → Google den Google Client ID und Client Secret sicher eintragen und den Provider aktivieren. Diese Zugangsdaten bleiben bei Supabase und gehören weder in Git noch in den Chat.
-6. In Render → Environment sicher setzen:
-   - `SUPABASE_URL`: deine Supabase-Projekt-URL, ohne Pfad.
-   - `SUPABASE_PUBLISHABLE_KEY`: der Publishable Key aus den Supabase-Projekteinstellungen; bei älteren Projekten alternativ `SUPABASE_ANON_KEY`.
-   - `ALLOWED_GOOGLE_EMAILS`: deine erlaubte Google-Adresse, bei Bedarf mehrere Adressen mit Kommas. Nur diese bestätigten Google-Konten bekommen Zugriff. So kann nicht jeder Besucher deine Gemini-Quote verwenden.
-   - `APP_ORIGIN=https://ai-erstellung.onrender.com` ist optional auf Render, weil dort RENDER_EXTERNAL_URL vorliegt.
-   - `GEMINI_API_KEY`, `APP_PASSWORD` und `NODE_ENV=production` erhalten.
-   **Niemals Supabase service_role oder einen Secret/Admin-Key verwenden.**
-7. Render neu bereitstellen. Auf der Login-Seite erscheint zusätzlich „Mit Google anmelden / Увійти через Google“. Deine PIN bleibt als lokale Alternative bestehen.
-8. Mit derselben freigegebenen Google-Adresse auf Handy und PC anmelden. In Einstellungen wird das Konto und der Sync-Status angezeigt. Auf dem alten Gerät bei Bedarf „Lokale Chats übernehmen“ bestätigen. Import kopiert; die bisherigen lokalen Chats werden dabei nicht gelöscht.
+1. Öffne https://console.firebase.google.com/ und erstelle ein Projekt im **Spark-Tarif** oder füge Firebase zu deinem bestehenden Google-Cloud-Projekt hinzu. Analytics ist für Wolke nicht erforderlich. Wenn Zahlungsdaten oder ein kostenpflichtiges Upgrade verlangt werden, stoppe dort.
+2. Unter **Authentication → Sign-in method / Anmeldemethode** Google aktivieren. Die Support-E-Mail wählen und speichern. Firebase richtet die Google-Anbindung ein; du musst keinen Google-Client-Secret in Wolke hinterlegen.
+3. Unter **Authentication → Settings → Authorized domains / Autorisierte Domains** `ai-erstellung.onrender.com` hinzufügen (ohne https und ohne Pfad).
+4. **Firestore Database → Create database** öffnen. Die Standard-Datenbank `(default)` im **Produktionsmodus** erstellen, nicht mit öffentlichen Testregeln. Eine passende kostenlose Region wählen, falls verfügbar.
+5. Unter Firestore → Rules den vollständigen Inhalt von `firebase/firestore.rules` einfügen und veröffentlichen. Die Regeln erlauben nur dem Besitzer Zugriff auf seinen Datensatz. Regeln niemals auf pauschal `allow read, write: if true` ändern.
+6. In Firebase → Projekteinstellungen → Allgemein eine **Web-App** (`</>`) namens Wolke registrieren. Firebase Hosting muss nicht aktiviert werden; die Website bleibt bei Render. Aus der angezeigten `firebaseConfig` werden diese Werte gebraucht:
+
+   | Firebase-Konfiguration | Render-Umgebungsvariable |
+   |---|---|
+   | apiKey | FIREBASE_API_KEY |
+   | projectId | FIREBASE_PROJECT_ID |
+   | authDomain | FIREBASE_AUTH_DOMAIN |
+   | appId | FIREBASE_APP_ID |
+
+   Nutze für authDomain die Standardadresse `DEIN-PROJEKT.firebaseapp.com`.
+7. Render → ai-erstellung → Environment: diese Werte und **ALLOWED_GOOGLE_EMAILS** mit deiner Google-Adresse eintragen. Mehrere erlaubte Adressen mit Kommas trennen. So kann nicht jeder Besucher deine Gemini-Quote verwenden. `GEMINI_API_KEY`, `APP_PASSWORD` und `NODE_ENV=production` behalten. Firebase-Web-API-Key ist ein anderer Zweck als Gemini-API-Key: die Werte aus der Firebase-Web-App verwenden. Private Service-Account-Dateien oder Admin-Schlüssel sind nicht erforderlich und dürfen nicht hochgeladen werden.
+8. In Render speichern und neu bereitstellen. Anschließend auf Wolke „Mit Google anmelden“ anklicken. Popups erlauben. Auf Handy und PC dasselbe freigegebene Google-Konto verwenden. Die jeweilige Sitzung wird mit sicheren Cookies gespeichert.
+9. In Einstellungen wird das Konto und der Sync-Status angezeigt. Auf dem alten Gerät „Lokale Chats übernehmen“ bestätigen, wenn alte PIN-Chats synchronisiert werden sollen. Danach auf dem zweiten Gerät „Jetzt synchronisieren“ drücken oder kurz warten.
 
 ## Prüfen
 
-- Auf Gerät A einen Testchat schreiben. „Synchronisiert“ in Einstellungen abwarten.
-- Auf Gerät B mit demselben Google-Konto anmelden, „Jetzt synchronisieren“ anklicken oder kurz warten. Der Chat sollte erscheinen.
-- Umbenennen, Sprache/Wetterort ändern und erneut synchronisieren. Löschungen werden mit synchronisiert.
-- Ein nicht freigegebenes Google-Konto muss abgewiesen werden. Andere Konten dürfen keine Daten lesen, auch nicht per Datenbank-API (RLS).
-- Bei „Cloud-Speicher nicht verfügbar“ SQL-Schema, RLS, Projektstatus und Schlüssel prüfen. Lokale Daten bleiben erhalten. Nach längerem Stillstand muss ein kostenloses pausiertes Supabase-Projekt ggf. im Dashboard fortgesetzt werden.
+- Chat auf Gerät A schreiben und „Synchronisiert“ abwarten; auf Gerät B anmelden und den Chat aus der Liste wählen.
+- Umbenennen, Sprache/Wetterort ändern und die Änderung auf dem anderen Gerät prüfen. Löschungen werden ebenfalls synchronisiert.
+- Bei `auth/unauthorized-domain` die Render-Domain in Firebase Authentication freigeben.
+- Bei `auth/operation-not-allowed` den Google-Anbieter aktivieren.
+- Bei Firestore-Zugriffsfehlern Datenbank, Regeln und Projekt-ID prüfen. Bei Quotenfehlern kostenlose Kontingente prüfen, nicht automatisch auf einen kostenpflichtigen Tarif wechseln.
+- Ein nicht freigegebenes Google-Konto wird vom Wolke-Backend abgelehnt. Die Firebase-Regeln verhindern, dass ein Konto Daten eines anderen Kontos liest oder schreibt.
 
-Ein Code-Deployment allein aktiviert Google OAuth nicht. Ein echter Google- und Zwei-Geräte-Test ist erst nach diesen Kontoeinstellungen möglich. In der Codex-Umgebung muss zusätzlich die konkrete Supabase-Projekt-Domain in der Netzwerkliste freigegeben werden; Render hat davon getrennte Netzwerkeinstellungen.
+Der Firebase-Spark-Tarif hat begrenzte kostenlose Kontingente. Die KI nutzt weiterhin Gemini und dessen separate Quote. Das App-Deployment allein erstellt kein Firebase-Projekt. Ohne die Konfiguration erscheint der Google-Knopf nicht; die PIN bleibt erhalten.

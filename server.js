@@ -7,9 +7,9 @@ import { pathToFileURL } from 'node:url';
 export const app = express();
 app.disable('x-powered-by');
 // Öffentliche, inhaltsfreie Versionsprüfung für den Deployment- und Bereitschaftscheck.
-app.get('/healthz',(req,res)=>res.set('Cache-Control','no-store').json({status:'ok',version:'wolke-connectivity-5'}));
+app.get('/healthz',(req,res)=>res.set('Cache-Control','no-store').json({status:'ok',version:'wolke-weather-fallback-6'}));
 app.use((req,res,next)=>{
-  res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store','Permissions-Policy':'camera=(), microphone=(), display-capture=()', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"});
+  res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store','Permissions-Policy':'camera=(), microphone=(), display-capture=()', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"});
   next();
 });
 app.use(['/api','/auth'],(req,res,next)=>{
@@ -59,6 +59,7 @@ app.use('/api',(req,res,next)=>{
   if(++entry.count>30)return res.status(429).json({error:'Забагато запитів. Зачекай хвилину.'});
   next();
 });
+app.get('/weather-client.js',(req,res)=>res.type('application/javascript').sendFile(new URL('./weather.js',import.meta.url).pathname));
 app.get('/api/weather',async(req,res,next)=>{try{res.json(await getWeather(req.query.city??'Germersheim'));}catch(e){next(e);}});
 app.get('/api/health',(req,res)=>res.json({provider:'gemini',configured:Boolean(process.env.GEMINI_API_KEY),model:process.env.GEMINI_CHAT_MODEL||'gemini-3.5-flash-lite'}));
 async function gemini(model,body,{signal,onChunk,fallback=true}={}){

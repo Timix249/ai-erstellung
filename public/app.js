@@ -15,7 +15,7 @@ async function api(path,body,onDelta=null,raw=false){
  const controller=new AbortController();requests.add(controller);updateRequests();
  try{
   const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Wolke-Language':settings.language},body:JSON.stringify(body),signal:controller.signal});
-  if(response.status===401){location.assign('/login');throw new Error('Уведи PIN, щоб продовжити.');}
+  if(response.status===401){location.assign('/login');throw new Error('Увійди через Google, щоб продовжити.');}
   if(!response.ok){let detail;try{detail=await response.json();}catch{}throw new Error(detail?.error||`Помилка сервера (${response.status}). Перевір вхід і з’єднання.`);}
   if(raw)return await response.blob();
   if(!onDelta)return await response.json();
@@ -112,7 +112,7 @@ $('closeSettings').onclick=()=>$('settingsDialog').close();
 function weatherSymbol(code,isDay=true){if(code===0)return isDay?'☀':'☾';if(code<=3)return '☁';if(code<=48)return '≋';if(code>=95)return 'ϟ';if((code>=71&&code<=77)||code===85||code===86)return '❄';return '☂';}
 function showWeather(data){weather=data;$('weatherSettings').textContent=data.location.name;$('weatherTemperature').textContent=Math.round(data.current.temperature)+'°';$('weatherIcon').textContent=weatherSymbol(data.current.code,data.current.isDay);$('weatherDescription').textContent=data.current.description;const details=[];if(data.current.apparentTemperature!==null)details.push('Відчувається як '+Math.round(data.current.apparentTemperature)+'°');if(data.current.wind!==null)details.push('Вітер '+Math.round(data.current.wind)+' км/год');$('weatherDetails').textContent=details.join(' · ');const today=data.days[0];$('weatherRange').textContent=today&&today.min!==null&&today.max!==null?'Мін. '+Math.round(today.min)+'° · Макс. '+Math.round(today.max)+'°':'';$('weatherCard').classList.remove('weather-error');}
 async function requestWeather(city,signal){
- try{const response=await fetch('/api/weather?'+new URLSearchParams({city}),{signal});if(response.status===401){location.assign('/login');throw Object.assign(new Error('Уведи PIN.'),{noFallback:true});}const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'Не вдалося отримати погоду.'),{noFallback:response.status===400||response.status===404});return data;}
+ try{const response=await fetch('/api/weather?'+new URLSearchParams({city}),{signal});if(response.status===401){location.assign('/login');throw Object.assign(new Error('Увійди через Google, щоб продовжити.'),{noFallback:true});}const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error||'Не вдалося отримати погоду.'),{noFallback:response.status===400||response.status===404});return data;}
  catch(error){if(error.name==='AbortError'||error.noFallback)throw error;
  const {getWeather}=await import('/weather-client.js');const data=await getWeather(city);if(signal?.aborted)throw new DOMException('Aborted','AbortError');return data;
  }

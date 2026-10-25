@@ -9,7 +9,7 @@
 ```sh
 npm ci
 cp .env.example .env
-# Укажи GEMINI_API_KEY у .env, лише на сервері.
+# Укажи GEMINI_API_KEY та Firebase-конфігурацію у .env. Див. GOOGLE-SYNC.md.
 npm start
 ```
 
@@ -22,7 +22,7 @@ npm start
 | Змінна | Значення |
 |---|---|
 | `GEMINI_API_KEY` | Серверний ключ Google Gemini |
-| `APP_PASSWORD` | PIN для входу; обов’язковий у production |
+| `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_AUTH_DOMAIN` | Обов’язкова Firebase-конфігурація для входу через Google; див. GOOGLE-SYNC.md |
 | `NODE_ENV` | `production` для публічного сервера |
 | `PORT` | Порт сервера, типово 3000; Render надає автоматично |
 | `APP_ORIGIN` | Точна HTTPS-адреса власного домену без кінцевого `/` |
@@ -30,7 +30,7 @@ npm start
 | `GEMINI_AUDIO_MODEL` | `gemini-3.5-flash-lite`, для сумісності з аудіо-API |
 | `GEMINI_SPEECH_MODEL` | `gemini-3.8-flash-tts` |
 
-На Render використовується `RENDER_EXTERNAL_URL`, якщо `APP_ORIGIN` не вказано. На сторінці входу є лише Wolke та поле PIN; ім’я користувача не потрібне. PIN дорівнює `APP_PASSWORD`. Передавай PIN лише через HTTPS. Сеанс зберігається до 7 днів через HttpOnly/SameSite-cookie (Secure у production). Після перезапуску сервера або зміни PIN потрібно ввійти знову. П’ять невдалих спроб блокують вхід на 10 хвилин. Кнопка «Вийти» завершує сеанс, але не видаляє локальну історію чатів. Не відключай перевірку TLS. Команда запуску використовує `--use-env-proxy`, щоб працювати з налаштованим HTTPS-проксі та довіреними CA.
+На Render використовується `RENDER_EXTERNAL_URL`, якщо `APP_ORIGIN` не вказано. На сторінці входу є кнопка Google; PIN не потрібний. Сесія автоматично оновлюється через захищені HttpOnly-cookie (Secure у production). Кнопка «Вийти» завершує сеанс, але не видаляє локальну історію чатів. Не відключай перевірку TLS. Команда запуску використовує `--use-env-proxy`, щоб працювати з налаштованим HTTPS-проксі та довіреними CA.
 
 ## Чати й приватність
 
@@ -52,17 +52,17 @@ Google обробляє надіслані дані за своїми прави
 
 ## Розгортання
 
-Інструкція — [VEROEFFENTLICHEN.md](VEROEFFENTLICHEN.md). На Render Node 24: build `npm ci --omit=dev`, start `npm start`, тариф **Free**. Не додавай платних послуг. Потрібні `GEMINI_API_KEY`, `APP_PASSWORD`, `NODE_ENV=production`. Для початкового створення через Blueprint є `render.yaml`. Увімкнений Auto-Deploy розгортає нові коміти гілки `main`; зміни коду самі не змінюють тариф і збережені секрети Render.
+Інструкція — [VEROEFFENTLICHEN.md](VEROEFFENTLICHEN.md). На Render Node 24: build `npm ci --omit=dev`, start `npm start`, тариф **Free**. Не додавай платних послуг. Потрібні `GEMINI_API_KEY`, Firebase-конфігурація та `NODE_ENV=production`. Для початкового створення через Blueprint є `render.yaml`. Увімкнений Auto-Deploy розгортає нові коміти гілки `main`; зміни коду самі не змінюють тариф і збережені секрети Render.
 
-Відкритий маршрут `GET /healthz` повертає лише стан і версію застосунку без конфігурації чи секретів. `GET /api/health` захищений паролем і перевіряє наявність ключа, але не гарантує працездатності Google. Інші маршрути також захищені. Для персонального використання є ліміт 30 API-запитів на хвилину та IP. За проксі користувачі можуть ділити одну IP-адресу; для багатокористувацької системи потрібні окрема авторизація, спільний rate-limiter та квоти.
+Відкритий маршрут `GET /healthz` повертає лише стан і версію застосунку без конфігурації чи секретів. `GET /api/health` захищений Google-входом і перевіряє наявність ключа, але не гарантує працездатності Google. Інші маршрути також захищені. Для персонального використання є ліміт 30 API-запитів на хвилину та IP. За проксі користувачі можуть ділити одну IP-адресу; для багатокористувацької системи потрібні окрема авторизація, спільний rate-limiter та квоти.
 
 ## Перевірка
 
 `npm test` — HTTP-тести з імітацією Gemini: українські інструкції, помилки, захист, аудіо, часткові UTF-8-фрагменти, потокова відповідь та її скасування. Вони не витрачають квоту API. `node --check server.js` і `node --check public/app.js` перевіряють синтаксис. Справжній Gemini потребує дійсного ключа й доступного контингенту.
 
-## PIN, погода та встановлення
+## Google-вхід, погода та встановлення
 
-На сторінці входу є лише **Wolke** та **PIN:** — ім’я користувача не потрібне. Поточний `APP_PASSWORD` залишається PIN. Після зміни PIN або перезапуску сервера потрібно ввійти знову. У production сесійний cookie захищений прапорцями Secure, HttpOnly і SameSite=Strict; п’ять неправильних спроб блокують вхід на 10 хвилин.
+На сторінці входу є анімована кнопка Google. Усі підтверджені Google-акаунти можуть увійти. PIN більше не використовується. Сесія зберігається у HttpOnly-cookie та автоматично оновлюється; повторний вхід потрібен після виходу, видалення cookie або відкликання доступу Google.
 
 Кнопка ⚙ відкриває налаштування: місто для погоди (типово **Germersheim**), короткі/звичайні/докладні відповіді, збільшений текст та автоматичне озвучення. Налаштування зберігаються локально на пристрої, як і історія чатів.
 
@@ -82,18 +82,20 @@ Google обробляє надіслані дані за своїми прави
 
 ## Мови та інструменти чату
 
-У налаштуваннях і на сторінці PIN доступні Deutsch / Українська. Вибір зберігається на пристрої та передається серверу як мова відповіді. Раніше збережені повідомлення не перекладаються. Пошук чатів перевіряє назви й текст. Чат можна перейменувати. Відповіді підтримують заголовки, жирний текст, посилання та блоки коду; HTML не виконується. Кнопки дозволяють копіювати текст або код і повторно створити останню відповідь. Повторна генерація використовує API-квоту; при помилці попередня відповідь залишається у збереженій історії.
+У налаштуваннях і на сторінці входу доступні Deutsch / Українська. Вибір зберігається на пристрої та передається серверу як мова відповіді. Раніше збережені повідомлення не перекладаються. Пошук чатів перевіряє назви й текст. Чат можна перейменувати. Відповіді підтримують заголовки, жирний текст, посилання та блоки коду; HTML не виконується. Кнопки дозволяють копіювати текст або код і повторно створити останню відповідь. Повторна генерація використовує API-квоту; при помилці попередня відповідь залишається у збереженій історії.
 
 ## Google-Anmeldung und Synchronisierung über Firebase
 
-Einrichtung: [GOOGLE-SYNC.md](GOOGLE-SYNC.md). Es wird Firebase Authentication mit Google und Cloud Firestore verwendet, kein Supabase. Ohne Konfiguration bleibt die PIN-Anmeldung unverändert; die Google-Schaltfläche erscheint erst bei vollständig vorhandenen Firebase-Einstellungen.
+Einrichtung: [GOOGLE-SYNC.md](GOOGLE-SYNC.md). Es wird Firebase Authentication mit Google und Cloud Firestore verwendet, kein Supabase. Die Anmeldung erfolgt ausschließlich über Google; ohne Konfiguration erscheint ein Einrichtungsfehler.
 
-Benötigt werden FIREBASE_API_KEY, FIREBASE_PROJECT_ID, FIREBASE_AUTH_DOMAIN, optional FIREBASE_APP_ID aus der Firebase-Web-App-Konfiguration sowie ALLOWED_GOOGLE_EMAILS. Die Firebase-Web-Konfiguration ist öffentlich und kein privater Admin-Schlüssel; Gemini-Schlüssel und Sitzungstoken bleiben serverseitig bzw. in HttpOnly-Cookies. Firebase wird lokal gebündelt (`npm run build`, automatisch nach `npm ci`); kein Firebase-SDK-CDN. Nur die von Firebase benötigten Google-Authentifizierungsdienste sind in CSP freigegeben. OAuth-Popup wird auf ausdrücklichen Klick geöffnet.
+Benötigt werden FIREBASE_API_KEY, FIREBASE_PROJECT_ID, FIREBASE_AUTH_DOMAIN, optional FIREBASE_APP_ID aus der Firebase-Web-App-Konfiguration. Die Firebase-Web-Konfiguration ist öffentlich und kein privater Admin-Schlüssel; Gemini-Schlüssel und Sitzungstoken bleiben serverseitig bzw. in HttpOnly-Cookies. Firebase wird lokal gebündelt (`npm run build`, automatisch nach `npm ci`); kein Firebase-SDK-CDN. Nur die von Firebase benötigten Google-Authentifizierungsdienste sind in CSP freigegeben. OAuth-Popup wird auf ausdrücklichen Klick geöffnet.
 
-Das Google-ID-Token wird vom Backend über Firebase accounts:lookup validiert; Projekt, Aussteller, UID, bestätigte E-Mail, Google-Anmeldeprovider und Freigabeliste werden zusätzlich geprüft. Zugriff/Refresh-Tokens liegen in HttpOnly-Cookies, nicht in localStorage. Der Server verwendet das persönliche Firebase-ID-Token auch für Firestore; ein Service-Account oder Admin-Key wird nicht verwendet. Die Regeln in firebase/firestore.rules müssen veröffentlicht werden. Nur der jeweilige Besitzer darf auf wolke_users/{uid} zugreifen.
+Das Google-ID-Token wird vom Backend über Firebase accounts:lookup validiert; Projekt, Aussteller, UID, bestätigte E-Mail und Google-Anmeldeprovider werden zusätzlich geprüft. Zugriff/Refresh-Tokens liegen in HttpOnly-Cookies, nicht in localStorage. Der Server verwendet das persönliche Firebase-ID-Token auch für Firestore; ein Service-Account oder Admin-Key wird nicht verwendet. Die Regeln in firebase/firestore.rules müssen veröffentlicht werden. Nur der jeweilige Besitzer darf auf wolke_users/{uid} zugreifen.
 
 Chats und Einstellungen werden nach Benutzer-ID getrennt gespeichert. Alte PIN-Chats werden erst nach Bestätigung übernommen. Lokale Änderungen bleiben bei Offline-Nutzung erhalten. Versionsnummern und Firestore-updateTime verhindern paralleles Überschreiben. Bei gleichzeitigen Änderungen desselben Chats gewinnt der neuere Chat-Zeitstempel. Löschmarkierungen verhindern Wiederherstellung aus älteren Kopien.
 
 Jeder Kontostand wird als ein Firestore-Dokument gespeichert. Es gilt eine Schutzgrenze von 750 KB UTF-8-JSON und maximal 200 Chats; größere lokale Verläufe bleiben lokal erhalten und die Synchronisierung meldet einen Fehler. Kostenlose Spark-Kontingente für Dokumentzugriffe und Authentifizierung gelten zusätzlich. Die Synchronisierung erfolgt nach Änderungen, beim Wiederöffnen und alle 30 Sekunden im sichtbaren Tab; unveränderte Daten werden nicht erneut geschrieben. Supabase-Konfigurationen werden nicht mehr verwendet; eventuelle alte Supabase-Daten werden nicht automatisch gelöscht oder migriert.
 
 Ein echter Login und geräteübergreifender Live-Test sind erst mit deinem Firebase-Projekt möglich. Integrationstests verwenden einen simulierten Firebase-Dienst. Die Codex-Netzwerkliste benötigt für Tests identitytoolkit.googleapis.com, securetoken.googleapis.com, firestore.googleapis.com sowie gegebenenfalls die projektspezifische Auth-Domain.
+
+Alle bestätigten Google-Konten dürfen sich anmelden. APP_PASSWORD und ALLOWED_GOOGLE_EMAILS werden ignoriert. Die Sitzung bleibt bis zu einem Jahr ohne Nutzung gespeichert und wird bei Token-Erneuerung verlängert. Eine Abmeldung, gelöschte Browserdaten oder ein Google-Widerruf erfordern erneute Anmeldung. Alle Nutzer teilen die Gemini-Quote des Servers.

@@ -1,6 +1,6 @@
 # Google-Anmeldung und Gerätesynchronisierung mit Firebase
 
-Die Anwendung ist auf Firebase von Google vorbereitet. Supabase ist nicht nötig. Bis zur Aktivierung bleibt die PIN verwendbar. Es werden keine kostenpflichtigen Dienste automatisch aktiviert.
+Die Anwendung ist auf Firebase von Google vorbereitet. Supabase ist nicht nötig. Die Anmeldung erfolgt ausschließlich über Google und steht allen bestätigten Google-Konten offen. Es werden keine kostenpflichtigen Dienste automatisch aktiviert.
 
 1. Öffne https://console.firebase.google.com/ und erstelle ein Projekt im **Spark-Tarif** oder füge Firebase zu deinem bestehenden Google-Cloud-Projekt hinzu. Analytics ist für Wolke nicht erforderlich. Wenn Zahlungsdaten oder ein kostenpflichtiges Upgrade verlangt werden, stoppe dort.
 2. Unter **Authentication → Sign-in method / Anmeldemethode** Google aktivieren. Die Support-E-Mail wählen und speichern. Firebase richtet die Google-Anbindung ein; du musst keinen Google-Client-Secret in Wolke hinterlegen.
@@ -17,8 +17,8 @@ Die Anwendung ist auf Firebase von Google vorbereitet. Supabase ist nicht nötig
    | appId | FIREBASE_APP_ID |
 
    Nutze für authDomain die Standardadresse `DEIN-PROJEKT.firebaseapp.com`.
-7. Render → ai-erstellung → Environment: diese Werte und **ALLOWED_GOOGLE_EMAILS** mit deiner Google-Adresse eintragen. Mehrere erlaubte Adressen mit Kommas trennen. So kann nicht jeder Besucher deine Gemini-Quote verwenden. `GEMINI_API_KEY`, `APP_PASSWORD` und `NODE_ENV=production` behalten. Firebase-Web-API-Key ist ein anderer Zweck als Gemini-API-Key: die Werte aus der Firebase-Web-App verwenden. Private Service-Account-Dateien oder Admin-Schlüssel sind nicht erforderlich und dürfen nicht hochgeladen werden.
-8. In Render speichern und neu bereitstellen. Anschließend auf Wolke „Mit Google anmelden“ anklicken. Popups erlauben. Auf Handy und PC dasselbe freigegebene Google-Konto verwenden. Die jeweilige Sitzung wird mit sicheren Cookies gespeichert.
+7. Render → ai-erstellung → Environment: die Firebase-Werte eintragen. `GEMINI_API_KEY` und `NODE_ENV=production` behalten. `APP_PASSWORD` und `ALLOWED_GOOGLE_EMAILS` werden nicht mehr verwendet und können entfernt werden. Alle Nutzer teilen die Gemini-Quote des Servers. Firebase-Web-API-Key und Gemini-API-Key haben unterschiedliche Zwecke: die Werte aus der Firebase-Web-App verwenden. Private Service-Account-Dateien oder Admin-Schlüssel sind nicht erforderlich und dürfen nicht hochgeladen werden.
+8. In Render speichern und neu bereitstellen. Anschließend auf Wolke „Mit Google anmelden“ anklicken. Popups erlauben. Auf Handy und PC dasselbe Google-Konto verwenden. Die Sitzung wird mit sicheren HttpOnly-Cookies gespeichert und automatisch erneuert, auch nach einem Serverneustart. Das Refresh-Cookie gilt bis zu einem Jahr und wird bei Erneuerung verlängert. Browser können Cookies früher löschen; nach Abmeldung, Widerruf durch Google oder gelöschten Browserdaten ist eine neue Anmeldung nötig.
 9. In Einstellungen wird das Konto und der Sync-Status angezeigt. Auf dem alten Gerät „Lokale Chats übernehmen“ bestätigen, wenn alte PIN-Chats synchronisiert werden sollen. Danach auf dem zweiten Gerät „Jetzt synchronisieren“ drücken oder kurz warten.
 
 ## Prüfen
@@ -28,6 +28,6 @@ Die Anwendung ist auf Firebase von Google vorbereitet. Supabase ist nicht nötig
 - Bei `auth/unauthorized-domain` die Render-Domain in Firebase Authentication freigeben.
 - Bei `auth/operation-not-allowed` den Google-Anbieter aktivieren.
 - Bei Firestore-Zugriffsfehlern Datenbank, Regeln und Projekt-ID prüfen. Bei Quotenfehlern kostenlose Kontingente prüfen, nicht automatisch auf einen kostenpflichtigen Tarif wechseln.
-- Ein nicht freigegebenes Google-Konto wird vom Wolke-Backend abgelehnt. Die Firebase-Regeln verhindern, dass ein Konto Daten eines anderen Kontos liest oder schreibt.
+- Jedes bestätigte Google-Konto darf sich anmelden. Die Firebase-Regeln verhindern, dass ein Konto Daten eines anderen Kontos liest oder schreibt.
 
-Der Firebase-Spark-Tarif hat begrenzte kostenlose Kontingente. Die KI nutzt weiterhin Gemini und dessen separate Quote. Das App-Deployment allein erstellt kein Firebase-Projekt. Ohne die Konfiguration erscheint der Google-Knopf nicht; die PIN bleibt erhalten.
+Der Firebase-Spark-Tarif hat begrenzte kostenlose Kontingente. Die KI nutzt weiterhin Gemini und dessen separate Quote. Das App-Deployment allein erstellt kein Firebase-Projekt. Ohne die Konfiguration zeigt die Anmeldung einen verständlichen Einrichtungsfehler; es gibt keinen PIN-Zugang.

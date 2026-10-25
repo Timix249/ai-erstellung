@@ -4,13 +4,12 @@ import {translate} from './public/i18n.js';
 import {searchWeb} from './web-search.js';
 import {getWeather,weatherSummary} from './weather.js';
 import multer from 'multer';
-import { timingSafeEqual, randomBytes, createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 export const app = express();
 app.disable('x-powered-by');
 // Öffentliche, inhaltsfreie Versionsprüfung für den Deployment- und Bereitschaftscheck.
-app.get('/healthz',(req,res)=>res.set('Cache-Control','no-store').json({status:'ok',version:'wolke-firebase-sync-11'}));
+app.get('/healthz',(req,res)=>res.set('Cache-Control','no-store').json({status:'ok',version:'wolke-google-login-12'}));
 app.use((req,res,next)=>{
   const json=res.json.bind(res);res.json=body=>json(body?.error?{...body,error:translate(body.error,req.body?.language||req.get('X-Wolke-Language')||'uk')}:body);
   res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store','Permissions-Policy':'camera=(), microphone=(), display-capture=()', 'Content-Security-Policy':"default-src 'self'; script-src 'self' https://apis.google.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; frame-src https://*.firebaseapp.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://apis.google.com https://*.firebaseapp.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"});
@@ -26,36 +25,14 @@ app.use(['/api','/auth'],(req,res,next)=>{
 app.use(cloudIdentity);
 app.use('/auth',express.json({limit:'24kb'}));
 registerCloud(app);
-const sessions=new Map(),loginAttempts=new Map(),sessionAge=7*24*60*60*1000;
-const passwordDigest=()=>createHash('sha256').update(process.env.APP_PASSWORD||'').digest('hex');
-function sessionToken(req){return (req.headers.cookie||'').split(';').map(c=>c.trim()).find(c=>c.startsWith('wolke_session='))?.slice('wolke_session='.length)||'';}
-function validSession(req){const token=sessionToken(req),session=sessions.get(token);if(!session)return false;if(session.expires<=Date.now()||session.password!==passwordDigest()){sessions.delete(token);return false;}return true;}
-function cookieOptions(){return {httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',path:'/'};}
-app.get('/login',(req,res)=>{if(req.cloudUser||(validSession(req)&&req.query.google!=='1')||(!process.env.APP_PASSWORD&&process.env.NODE_ENV!=='production'))return res.redirect('/');res.sendFile(new URL('./public/login.html',import.meta.url).pathname);});
-for(const file of ['login.js','login.css','i18n.js','firebase-login.js','vendor/firebase.js','manifest.webmanifest','logo.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'])app.get('/'+file,(req,res)=>res.sendFile(new URL('./public/'+file,import.meta.url).pathname));
-
-app.post('/auth/login',(req,res)=>{
-  if(!process.env.APP_PASSWORD)return res.status(503).json({error:'PIN ще не налаштовано. Укажи APP_PASSWORD на сервері.'});
-  const now=Date.now();
-  for(const [key,value] of loginAttempts)if(value.until<=now)loginAttempts.delete(key);
-  if(loginAttempts.size>=10000&&!loginAttempts.has(req.ip))return res.status(429).json({error:'Забагато спроб. Спробуй пізніше.'});
-  let attempt=loginAttempts.get(req.ip);if(!attempt){attempt={count:0,until:now+10*60*1000};loginAttempts.set(req.ip,attempt);}
-  if(attempt.count>=5)return res.set('Retry-After',String(Math.ceil((attempt.until-now)/1000))).status(429).json({error:'Забагато спроб. Зачекай 10 хвилин.'});
-  const supplied=typeof req.body?.pin==='string'&&req.body.pin.length<=512?req.body.pin:'';
-  const a=createHash('sha256').update(supplied).digest(),b=createHash('sha256').update(process.env.APP_PASSWORD).digest();
-  if(!timingSafeEqual(a,b)){attempt.count++;return res.status(401).json({error:'Неправильний PIN.'});}
-  loginAttempts.delete(req.ip);
-  for(const [key,value] of sessions)if(value.expires<=now)sessions.delete(key);
-  if(sessions.size>=1000)sessions.delete(sessions.keys().next().value);
-  sessions.delete(sessionToken(req));const token=randomBytes(32).toString('hex');sessions.set(token,{expires:now+sessionAge,password:passwordDigest()});
-  res.cookie('wolke_session',token,{...cookieOptions(),maxAge:sessionAge}).json({ok:true});
-});
-app.post('/auth/logout',(req,res)=>{clearCloud(res);sessions.delete(sessionToken(req));res.clearCookie('wolke_session',cookieOptions()).json({ok:true});});
+app.get('/login',(req,res)=>{if(req.cloudUser)return res.redirect('/');res.sendFile(new URL('./public/login.html',import.meta.url).pathname);});
+for(const file of ['login.js','login.css','i18n.js','firebase-login.js','vendor/firebase.js','manifest.webmanifest','logo.svg','google.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'])app.get('/'+file,(req,res)=>res.sendFile(new URL('./public/'+file,import.meta.url).pathname));
+app.post('/auth/login',(req,res)=>res.status(410).json({error:'Увійди через Google, щоб продовжити.'}));
+app.post('/auth/logout',(req,res)=>{clearCloud(res);res.clearCookie('wolke_session',{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',path:'/'}).json({ok:true});});
 app.use((req,res,next)=>{
   if(req.cloudUser)return next();
-  if(process.env.NODE_ENV==='production'&&!process.env.APP_PASSWORD)return req.path.startsWith('/api/')?res.status(503).json({error:'PIN не налаштовано на сервері.'}):res.redirect('/login');
-  if(process.env.APP_PASSWORD&&!validSession(req))return req.path.startsWith('/api/')?res.status(401).json({error:'Уведи PIN, щоб продовжити.'}):res.redirect('/login');
-  next();
+  if(req.path.startsWith('/api/'))return res.status(req.cloudUnavailable||!cloudEnabled()?503:401).json({error:!cloudEnabled()?'Google-вхід ще не налаштовано.':req.cloudUnavailable?'Google тимчасово недоступний. Спробуй ще раз.':'Увійди через Google, щоб продовжити.'});
+  res.redirect('/login');
 });
 app.use(express.json({limit:'12mb'}));
 const limits=new Map();

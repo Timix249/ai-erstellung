@@ -2,7 +2,7 @@ FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-COPY server.js weather.js ./
+COPY server.js weather.js web-search.js ./
 COPY public ./public
 ENV NODE_ENV=production PORT=3000
 USER node

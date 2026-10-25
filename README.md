@@ -35,7 +35,7 @@ npm start
 ## Чати й приватність
 
 - Новий чат створюється кнопкою «Новий чат». Список зліва на комп’ютері та випадаючий список на телефоні дозволяють продовжити розмову.
-- Текстова історія зберігається в `localStorage` цього браузера, зокрема після закриття вкладки. Синхронізації між пристроями немає. У приватному режимі браузер може видалити історію після закриття.
+- Текстова історія зберігається в `localStorage` цього браузера, зокрема після закриття вкладки. Без підключеного Google-акаунта синхронізації між пристроями немає. У приватному режимі браузер може видалити історію після закриття.
 - Історію можна видалити кнопкою видалення чату. Очищення даних браузера видаляє всі чати. Якщо сховище переповнене або заблоковане, застосунок повідомляє, що збереження не вдалося.
 - Для кожної відповіді передаються до 30 останніх текстових повідомлень. Старіші повідомлення збережені для читання, але модель може не пам’ятати їх. Перервана відповідь не потрапляє до збереженого контексту.
 - Немає панелі камери, мікрофона чи показу екрана. Браузер не запитує доступу до цих пристроїв. Старі захищені серверні маршрути аналізу зображень і транскрипції збережені для сумісності.
@@ -83,3 +83,11 @@ Google обробляє надіслані дані за своїми прави
 ## Мови та інструменти чату
 
 У налаштуваннях і на сторінці PIN доступні Deutsch / Українська. Вибір зберігається на пристрої та передається серверу як мова відповіді. Раніше збережені повідомлення не перекладаються. Пошук чатів перевіряє назви й текст. Чат можна перейменувати. Відповіді підтримують заголовки, жирний текст, посилання та блоки коду; HTML не виконується. Кнопки дозволяють копіювати текст або код і повторно створити останню відповідь. Повторна генерація використовує API-квоту; при помилці попередня відповідь залишається у збереженій історії.
+
+## Google-Anmeldung und Cloud-Synchronisierung
+
+Einrichtung: [GOOGLE-SYNC.md](GOOGLE-SYNC.md). Ohne Konfiguration funktioniert der bestehende PIN-Zugang unverändert; Cloud-Sync wird nicht als aktiv angezeigt. Google-Login erfordert SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (oder SUPABASE_ANON_KEY), ALLOWED_GOOGLE_EMAILS sowie die öffentliche Origin. Supabase muss Google OAuth aktiviert haben und das SQL-Schema mit RLS enthalten.
+
+Nach Google-Login werden Chats, Löschungen und Einstellungen im privaten Supabase-Datensatz des jeweiligen Kontos gespeichert. Browserdaten sind nach Benutzer-ID getrennt. Alte PIN-Chats werden nicht automatisch übertragen; dafür gibt es einen expliziten Importknopf. Synchronisierung erfolgt nach Änderungen, beim erneuten Öffnen der Seite, bei wiederhergestelltem Internet und alle 30 Sekunden im sichtbaren Tab. Geräte verwenden Versionsprüfungen gegen paralleles Überschreiben. Bei gleichzeitigen Änderungen desselben Chats gewinnt der neuere Chat-Zeitstempel; Löschmarkierungen verhindern, dass ältere Kopien gelöschte Chats wiederherstellen. Bei Offline-Nutzung bleiben lokale Änderungen erhalten.
+
+Zugriffstoken liegen nur in HttpOnly-Cookies, niemals in localStorage. Google-OAuth nutzt PKCE; die erlaubten E-Mail-Adressen werden serverseitig geprüft. Das Backend greift auf die Datenbank mit dem Token des Benutzers zu, nicht mit einem Admin-/Service-Schlüssel. RLS muss aktiv bleiben. Die bisherigen Aussagen zur rein lokalen Speicherung gelten nur für den PIN-Modus ohne verbundenes Google-Konto. Supabase und Google verarbeiten Kontodaten; Supabase speichert die gewählten synchronisierten Chattexte und Einstellungen. Keine Medien-Synchronisierung. Kontolimits und mögliche Pausierung kostenloser Supabase-Projekte beachten.

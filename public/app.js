@@ -1,9 +1,11 @@
+import {mergeState} from './sync-state.js';
 import {translate,installLanguage} from './i18n.js';
 let savedLanguage='uk';try{savedLanguage=JSON.parse(localStorage.getItem('wolke.settings.v1')||'null')?.language==='de'?'de':'uk';}catch{}
 const applyLanguage=installLanguage(savedLanguage);
 const $=id=>document.getElementById(id);
 let retryMode=false;
-const storageKey='wolke.chats.v1',requests=new Set();
+let storageKey='wolke.chats.v1',settingsStorageKey='wolke.settings.v1';const requests=new Set();
+let cloudUser=null,cloudConfigured=false,cloudDirty=false,cloudSyncing=false,cloudApplying=false,cloudTimer=null,cloudReady=false,deletedChats={},settingsUpdated=0;
 let settings={city:'Germersheim',answerStyle:'normal',textSize:'normal',autoVoice:false,webSearch:false,language:savedLanguage},weather=null,weatherRequest=null;
 let chats=[],activeChatId=null,history=[],busy=false,noticeTimer=null,storageReadable=true,audio=null,audioURL=null,speechEpoch=0;
 function notify(text,error=false){clearTimeout(noticeTimer);$('status').textContent=text;$('status').classList.toggle('error',error);$('status').hidden=false;noticeTimer=setTimeout(()=>$('status').hidden=true,error?12000:5000);}
@@ -48,6 +50,7 @@ function renderChatList(){
 function persistChats(){
  if(storageReadable)try{localStorage.setItem(storageKey,JSON.stringify({chats,activeChatId}));}catch{notify('Браузер не зберіг історію. Перевір вільне місце й дозволи.',true);}
  renderChatList();
+ if(!cloudApplying)queueCloudSync();
 }
 function saveCurrentChat(){const chat=chats.find(c=>c.id===activeChatId);if(!chat)return;chat.messages=history.map(m=>({role:m.role,content:m.content}));if(!chat.customTitle)chat.title=history.find(m=>m.role==='user')?.content.slice(0,55)||'Новий чат';chat.updated=Date.now();persistChats();}
 function openChat(id){if(busy)return;const chat=chats.find(c=>c.id===id);if(!chat)return;abortRequests();activeChatId=id;history=chat.messages.map(m=>({...m}));$('prompt').value='';resizeInput();$('messages').replaceChildren();for(const m of history)addMessage(m.role,m.content);if(!history.length)showWelcome();persistChats();}
@@ -66,7 +69,7 @@ $('prompt').oninput=resizeInput;
 $('chatSelect').onchange=e=>openChat(e.target.value);
 function newChat(){if(busy)return;const empty=chats.find(c=>!c.messages.length);if(empty){openChat(empty.id);return;}const chat=freshChat();chats.push(chat);openChat(chat.id);}
 $('newChat').onclick=newChat;$('mobileNewChat').onclick=newChat;
-$('clearChat').onclick=()=>{if(busy||!confirm(settings.language==='de'?'Diesen Chat unwiderruflich löschen?':'Видалити цей чат? Відновити його буде неможливо.'))return;chats=chats.filter(c=>c.id!==activeChatId);if(!chats.length)chats.push(freshChat());openChat(chats[0].id);};
+$('clearChat').onclick=()=>{if(busy||!confirm(settings.language==='de'?'Diesen Chat unwiderruflich löschen?':'Видалити цей чат? Відновити його буде неможливо.'))return;deletedChats[activeChatId]=Date.now();saveSyncMeta();chats=chats.filter(c=>c.id!==activeChatId);if(!chats.length)chats.push(freshChat());openChat(chats[0].id);};
 $('chatForm').onsubmit=async e=>{
  e.preventDefault();if(busy)return;const text=$('prompt').value.trim();if(!text)return;
  const regenerating=retryMode;retryMode=false;const baseHistory=regenerating?history.slice(0,-2):history;let completed=false;
@@ -95,13 +98,14 @@ function abortRequests(){for(const controller of requests)controller.abort();spe
 $('stopRequest').onclick=abortRequests;
 $('privacyButton').onclick=$('mobilePrivacy').onclick=()=>$('privacyDialog').showModal();
 window.addEventListener('pagehide',abortRequests);
+await setupCloudAccount();
 initializeChats();
 fetch('/api/health').then(async r=>{if(r.status===401){location.assign('/login');return;}if(!r.ok)throw new Error('Перевір вхід або з’єднання.');const data=await r.json();$('connection').textContent=data.configured?'Готова допомогти':'Немає ключа API';$('connection').classList.toggle('warning',!data.configured);}).catch(error=>{$('connection').textContent='Немає з’єднання';$('connection').classList.add('warning');report(error);});
 
 async function logout(){abortRequests();try{const response=await fetch('/auth/logout',{method:'POST'});if(!response.ok)throw new Error();location.assign('/login');}catch{notify('Не вдалося вийти. Спробуй ще раз.',true);}}
 $('logout').onclick=$('mobileLogout').onclick=logout;
 
-function loadSettings(){try{const stored=JSON.parse(localStorage.getItem('wolke.settings.v1')||'null');if(stored){if(typeof stored.city==='string'&&stored.city.trim().length>=2&&stored.city.length<=100)settings.city=stored.city.trim();if(['short','normal','detailed'].includes(stored.answerStyle))settings.answerStyle=stored.answerStyle;if(['normal','large'].includes(stored.textSize))settings.textSize=stored.textSize;settings.language=stored.language==='de'?'de':'uk';settings.autoVoice=stored.autoVoice===true;settings.webSearch=stored.webSearch===true;}}catch{}document.documentElement.dataset.textSize=settings.textSize;}
+function loadSettings(){try{const stored=JSON.parse(localStorage.getItem(settingsStorageKey)||'null');if(stored){if(typeof stored.city==='string'&&stored.city.trim().length>=2&&stored.city.length<=100)settings.city=stored.city.trim();if(['short','normal','detailed'].includes(stored.answerStyle))settings.answerStyle=stored.answerStyle;if(['normal','large'].includes(stored.textSize))settings.textSize=stored.textSize;settings.language=stored.language==='de'?'de':'uk';settings.autoVoice=stored.autoVoice===true;settings.webSearch=stored.webSearch===true;}}catch{}document.documentElement.dataset.textSize=settings.textSize;}
 function openSettings(){const form=$('settingsForm');form.elements.city.value=settings.city;$('language').value=settings.language;$('answerStyle').value=settings.answerStyle;$('textSize').value=settings.textSize;$('autoVoice').checked=settings.autoVoice;$('webSearch').checked=settings.webSearch;$('settingsError').hidden=true;$('settingsDialog').showModal();}
 $('settingsButton').onclick=$('weatherSettings').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();
@@ -116,8 +120,8 @@ async function requestWeather(city,signal){
 async function refreshWeather(){weatherRequest?.abort();const controller=new AbortController();weatherRequest=controller;$('refreshWeather').disabled=true;try{const data=await requestWeather(settings.city,controller.signal);if(!controller.signal.aborted)showWeather(data);}catch(error){if(error.name!=='AbortError'){$('weatherCard').classList.add('weather-error');$('weatherDescription').textContent=weather?'Не вдалося оновити погоду':'Погода тимчасово недоступна';$('weatherDetails').textContent=weather?'Показано попередні дані. Натисни ↻.':error.message;}}finally{if(weatherRequest===controller)$('refreshWeather').disabled=false;}}
 $('refreshWeather').onclick=refreshWeather;
 $('askWeather').onclick=()=>{if(busy)return;$('prompt').value='Яка погода в '+settings.city+' сьогодні та завтра?';resizeInput();$('chatForm').requestSubmit();};
-$('settingsForm').onsubmit=async event=>{event.preventDefault();const city=$('weatherCity').value.trim();if(city.length<2)return;const button=$('saveSettings');button.disabled=true;$('settingsError').hidden=true;try{let data=weather;if(city!==settings.city)data=await requestWeather(city);const updated={city,answerStyle:$('answerStyle').value,textSize:$('textSize').value,autoVoice:$('autoVoice').checked,webSearch:$('webSearch').checked,language:$('language').value};localStorage.setItem('wolke.settings.v1',JSON.stringify(updated));settings=updated;applyLanguage(settings.language);document.documentElement.dataset.textSize=settings.textSize;weatherRequest?.abort();if(data)showWeather(data);else void refreshWeather();$('settingsDialog').close();notify('Налаштування збережено.');}catch(error){$('settingsError').textContent=error.message||'Не вдалося зберегти налаштування.';$('settingsError').hidden=false;}finally{button.disabled=false;}};
-loadSettings();refreshWeather();
+$('settingsForm').onsubmit=async event=>{event.preventDefault();const city=$('weatherCity').value.trim();if(city.length<2)return;const button=$('saveSettings');button.disabled=true;$('settingsError').hidden=true;try{let data=weather;if(city!==settings.city)data=await requestWeather(city);const updated={city,answerStyle:$('answerStyle').value,textSize:$('textSize').value,autoVoice:$('autoVoice').checked,webSearch:$('webSearch').checked,language:$('language').value};localStorage.setItem(settingsStorageKey,JSON.stringify(updated));settings=updated;settingsUpdated=Date.now();saveSyncMeta();queueCloudSync();applyLanguage(settings.language);document.documentElement.dataset.textSize=settings.textSize;weatherRequest?.abort();if(data)showWeather(data);else void refreshWeather();$('settingsDialog').close();notify('Налаштування збережено.');}catch(error){$('settingsError').textContent=error.message||'Не вдалося зберегти налаштування.';$('settingsError').hidden=false;}finally{button.disabled=false;}};
+loadSettings();applyLanguage(settings.language);refreshWeather();cloudReady=true;if(cloudUser)void syncCloud();
 setInterval(()=>{if(!document.hidden)void refreshWeather();},15*60*1000);
 window.addEventListener('pagehide',()=>weatherRequest?.abort());
 
@@ -130,3 +134,34 @@ function renderText(el,text){
 $('chatSearch').oninput=()=>{$('mobileChatSearch').value=$('chatSearch').value;renderChatList();};$('mobileChatSearch').oninput=()=>{$('chatSearch').value=$('mobileChatSearch').value;renderChatList();};
 $('renameChat').onclick=()=>{if(busy)return;const chat=chats.find(c=>c.id===activeChatId);const title=prompt(translate('Назва чату',settings.language),chat.title);if(title?.trim()){chat.title=title.trim().slice(0,100);chat.customTitle=true;persistChats();}};
 async function copyText(text){try{await navigator.clipboard.writeText(text);notify('Скопійовано.');}catch{notify('Не вдалося скопіювати.',true);}}
+
+function saveSyncMeta(){try{localStorage.setItem(storageKey+'.sync',JSON.stringify({deletedChats,settingsUpdated}));}catch{}}
+function snapshot(){return {chats,deletedChats,settings,settingsUpdated};}
+async function setupCloudAccount(){
+ try{const response=await fetch('/api/account');if(response.status===401){location.assign('/login');return;}if(!response.ok)throw new Error();const data=await response.json();cloudConfigured=data.googleConfigured;cloudUser=data.user;
+  if(cloudUser){storageKey='wolke.chats.user.'+cloudUser.id;settingsStorageKey='wolke.settings.user.'+cloudUser.id;const meta=JSON.parse(localStorage.getItem(storageKey+'.sync')||'{}');deletedChats=meta.deletedChats||{};settingsUpdated=meta.settingsUpdated||0;$('cloudAccount').textContent=cloudUser.email;$('syncNow').hidden=false;$('importLocalChats').hidden=!localStorage.getItem('wolke.chats.v1');}
+  else{$('cloudConnect').hidden=!cloudConfigured;$('cloudStatus').textContent=cloudConfigured?'Увійди через Google для синхронізації':'Google-синхронізацію ще не налаштовано на сервері';}
+ }catch{$('cloudStatus').textContent='Не вдалося перевірити хмарний обліковий запис. Локальні чати збережено.';}
+}
+function queueCloudSync(){if(!cloudUser||!cloudReady||cloudApplying)return;cloudDirty=true;$('cloudStatus').textContent='Є локальні зміни';clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>void syncCloud(),900);}
+function applyMergedState(data){
+ chats=data.chats;deletedChats=data.deletedChats;settingsUpdated=data.settingsUpdated;
+ if(data.settings&&data.settings!==settings){settings={...settings,...data.settings};localStorage.setItem(settingsStorageKey,JSON.stringify(settings));applyLanguage(settings.language==='de'?'de':'uk');document.documentElement.dataset.textSize=settings.textSize;void refreshWeather();}
+ saveSyncMeta();cloudApplying=true;persistChats();cloudApplying=false;
+ if(!busy){let chat=chats.find(c=>c.id===activeChatId);if(!chat){if(!chats.length)chats.push(freshChat());chat=chats[0];activeChatId=chat.id;}if(JSON.stringify(history)!==JSON.stringify(chat.messages)){history=chat.messages.map(m=>({...m}));$('messages').replaceChildren();for(const m of history)addMessage(m.role,m.content);if(!history.length)showWelcome();}renderChatList();}
+}
+async function syncCloud(){
+ if(!cloudUser||!cloudReady)return;if(cloudSyncing){cloudDirty=true;return;}cloudSyncing=true;$('cloudStatus').textContent='Синхронізація…';
+ try{for(let attempt=0;attempt<3;attempt++){
+   const response=await fetch('/api/sync');if(response.status===401)throw new Error('Увійди через Google ще раз');if(!response.ok)throw new Error('Хмарне сховище недоступне');const remote=await response.json();
+   const merged=mergeState(snapshot(),remote.data);applyMergedState(merged);cloudDirty=false;if(remote.data&&JSON.stringify(remote.data)===JSON.stringify(merged)){$('cloudStatus').textContent='Синхронізовано';return;}
+   const saved=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:remote.revision,data:merged})});if(saved.status===409)continue;if(!saved.ok)throw new Error('Не вдалося зберегти в хмарі');$('cloudStatus').textContent='Синхронізовано';return;
+  }throw new Error('Одночасні зміни. Повторимо синхронізацію');
+ }catch(error){cloudDirty=true;$('cloudStatus').textContent=error.message+' · локальні дані збережено';}
+ finally{cloudSyncing=false;if(cloudDirty){clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>void syncCloud(),30000);}}
+}
+$('syncNow').onclick=()=>void syncCloud();
+$('importLocalChats').onclick=()=>{if(!cloudUser)return;try{const data=JSON.parse(localStorage.getItem('wolke.chats.v1')||'{}');if(!Array.isArray(data.chats))return;const question=settings.language==='de'?'Lokale Chats in dieses Google-Konto übernehmen?':'Імпортувати локальні чати в цей Google-акаунт?';if(!confirm(question))return;const existing=new Set(chats.map(c=>c.id));for(const c of data.chats){if(typeof c.id==='string'&&typeof c.title==='string'&&Number.isFinite(c.updated)&&Array.isArray(c.messages)&&c.messages.every(m=>['user','assistant'].includes(m.role)&&typeof m.content==='string')&&!existing.has(c.id))chats.push(c);}persistChats();notify(settings.language==='de'?'Lokale Chats übernommen.':'Локальні чати імпортовано.');}catch{notify(settings.language==='de'?'Import fehlgeschlagen.':'Не вдалося імпортувати.',true);}};
+setInterval(()=>{if(!document.hidden&&cloudUser&&!busy)void syncCloud();},30000);
+window.addEventListener('online',()=>{if(cloudUser)void syncCloud();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudUser&&!busy)void syncCloud();});
